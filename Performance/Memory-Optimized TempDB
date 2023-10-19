@@ -1,0 +1,22 @@
+--Open SQL Server Management Studio and connect to your SQL Server instance.
+--Open a new query window and run the following command to enable the memory-optimized TempDB metadata feature:
+
+ALTER SERVER CONFIGURATION SET MEMORY_OPTIMIZED TEMPDB_METADATA = ON;
+
+--This configuration change requires a restart of the SQL Server service to take effect. You can restart the service using the SQL Server Configuration Manager
+--Once the service has restarted, you can verify whether or not TempDB is memory-optimized by running the following command:
+
+
+SELECT SERVERPROPERTY('IsTempdbMetadataMemoryOptimized');
+
+--If the result is 1, then TempDB metadata is memory-optimized. If the result is 0, then it is not.
+--You can also use sp_configure to set the memory-optimized TempDB metadata parameter using the following T-SQL:
+
+EXEC sys.sp_configure N'show advanced options', 1;
+RECONFIGURE WITH OVERRIDE;
+EXEC sys.sp_configure N'tempdb metadata memory-optimized', 1;
+RECONFIGURE WITH OVERRIDE;
+
+--To check the current value of the memory-optimized TempDB metadata parameter, you can run the following query:
+
+SELECT CASE WHEN value <> value_in_use THEN 'restart required' END, * FROM sys.configurations WHER

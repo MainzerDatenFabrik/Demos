@@ -1,0 +1,71 @@
+USE Test
+GO
+DROP TABLE IF Exists TBL_Test
+;with TBL_0(c) As
+ (Select 0 Union All Select 0),
+  Tbl_1 AS (Select t1.C From Tbl_0 t1 Cross Join Tbl_0 t2),
+  Tbl_2 AS (Select t1.C From Tbl_1 t1 Cross Join Tbl_1 t2),
+  Tbl_3 AS (Select t1.C From Tbl_2 t1 Cross Join Tbl_2 t2),
+  Tbl_4 AS (Select t1.C From Tbl_3 t1 Cross Join Tbl_3 t2),
+  Tbl_5 AS (Select t1.C From Tbl_4 t1 Cross Join Tbl_4 t2),
+  Tbl_6 AS (Select t1.C From Tbl_5 t1 Cross Join Tbl_3 t2)
+Select DATEADD(SECOND, r * 2.63, '2016-01-01') As RegisterDate, r As Id Into Tbl_Test 
+From 
+ ( Select Top 12000000 ROW_NUMBER() Over(Order By (Select Null)) As r From Tbl_6 ) t  
+GO
+CREATE CLUSTERED INDEX IX_RegisterDate on Tbl_Test (RegisterDate)
+GO
+USE TBL_Test_CCI
+GO
+DROP TABLE IF Exists TBL_Test_CCI
+;with TBL_0(c) As
+ (Select 0 Union All Select 0),
+  Tbl_1 AS (Select t1.C From Tbl_0 t1 Cross Join Tbl_0 t2),
+  Tbl_2 AS (Select t1.C From Tbl_1 t1 Cross Join Tbl_1 t2),
+  Tbl_3 AS (Select t1.C From Tbl_2 t1 Cross Join Tbl_2 t2),
+  Tbl_4 AS (Select t1.C From Tbl_3 t1 Cross Join Tbl_3 t2),
+  Tbl_5 AS (Select t1.C From Tbl_4 t1 Cross Join Tbl_4 t2),
+  Tbl_6 AS (Select t1.C From Tbl_5 t1 Cross Join Tbl_3 t2)
+Select DATEADD(SECOND, r * 2.63, '2016-01-01') As RegisterDate, r As Id Into Tbl_Test_CCI 
+From 
+ ( Select Top 12000000 ROW_NUMBER() Over(Order By (Select Null)) As r From Tbl_6 ) t  
+GO
+CREATE CLUSTERED COLUMNSTORE INDEX IX_TBL_CCI On Tbl_Test_CCI
+INSERT INTO Tbl_Test_CCI
+SELECT * FROM Tbl_Test
+GO
+SET STATISTICS IO ON
+SELECT Max(Id) 
+FROM dbo.Tbl_Test_CCI
+WHERE RegisterDate BETWEEN '2016-04-05' AND '2016-05-05'
+GO
+SET STATISTICS IO ON
+ALTER INDEX IX_CCI On Tbl_Test_CCI Rebuild
+GO
+SELECT Max(Id) 
+FROM dbo.Tbl_Test_CCI
+WHERE RegisterDate BETWEEN '2016-04-05' AND '2016-05-05'
+GO
+CREATE PARTITION FUNCTION PF_Monthly_(dateTime)
+AS RANGE RIGHT FOR VALUES 
+(
+ '2016-01-01', '2016-01-02', '2016-01-03', '2016-01-04',
+ '2016-01-05', '2016-01-06', '2016-01-07', '2016-01-08',
+ '2016-01-09', '2016-01-10', '2016-01-11', '2016-01-12'
+) 
+GO
+CREATE PARTITION SCHEME PS_Monthly_
+AS PARTITION PF_Monthly_
+ALL TO ([PRIMARY])
+GO
+DROP INDEX IX_CCI On Tbl_Test_CCI
+CREATE CLUSTERED INDEX IX_CCI On Tbl_Test_CCI (RegisterDate)
+On PS_Monthly_ (RegisterDate)
+GO
+CREATE CLUSTERED COLUMNSTORE INDEX IX_CCI On Tbl_Test_CCI
+With (Drop_Existing = On) On PS_Monthly_ (RegisterDate)
+GO
+SELECT Max(Id) 
+FROM dbo.Tbl_Test_CCI
+WHERE RegisterDate BETWEEN '2016-04-05' AND '2016-05-05'
+GO
